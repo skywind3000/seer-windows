@@ -197,6 +197,10 @@ Windows 不做 GUI 内虚拟终端，被调试程序弹出独立控制台窗口�
 最小化的改动来隔离，而不是在 `SeerConsoleWidget` 里到处撒
 `#ifdef`。）
 
+（D1 范围说明预留的「GUI 内 ConPTY 虚拟终端」可选增强，日后若评估
+立项，参照系调研——Qt Creator / vim 的 libvterm + ConPTY 两层结构
+与调试接线方式——见 `docs/porting/qtcreator-terminal-research.md`。）
+
 ### 其余平台耦合点
 
 除 PTY 外范围很小（2026-10-20 grep 结果；**这是移植前的耦合点
