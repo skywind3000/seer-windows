@@ -33,6 +33,13 @@ issue #94 是本项目最重要的背景资料，动手移植前请先读完它�
   - 仓库没有 push 级 CI（D19）——自动构建只在发布 release 时
     发生（`windows-release.yml`）；日常与归并前的验证靠本地
     双平台构建（maintenance.md §1）。
+- `pr/*`：向上游输出 PR 的短命分支（D22），一律**从
+  `upstream-main`（刚快进的上游 tip）切出**、推 origin、在
+  GitHub 上向 `epasveer:main` 发 PR；不从 `main`/`develop` 切
+  （会带上 fork 专属提交）。一个 PR 一个分支，串行推进，上游
+  merge 或放弃即删；review 意见的改动以作者为准并同步回带
+  `main`。完整队列、提取手法与验收纪律见
+  `docs/porting/upstream-prs.md`。
 - `upstream-main`：上游 `main` 的只读镜像（本地与 origin 同名分支），
   只在同步上游时快进（`git fetch upstream main:upstream-main`），
   平时不提交任何改动。

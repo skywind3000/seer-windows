@@ -1,8 +1,19 @@
 # Seer Windows fork 变更记录
 
 本文件是 fork 自身的变更记录（上游 `CHANGELOG.md` 保持原样）。
-决策详情见 `docs/porting/decisions.md`（D1-D20），验证矩阵见
+决策详情见 `docs/porting/decisions.md`（D1-D22），验证矩阵见
 `docs/porting/verification.md`，总体计划见 `docs/plan.md`。
+
+## 2026-11-03 — 启动上游 PR 输出（D22）
+
+- 上游作者于 2026-11-02 在 issue #94 同意接受 PR 后，fork 的
+  移植成果转为按计划向上游输出：拆 8 个小 PR 串行提交（接受度
+  × 基础性排序，每 PR 独立可验收，总量约 600 行 src/ 改动）。
+- 新增 `pr/*` 短命分支类型（从 `upstream-main` 切出、推 origin、
+  向 epasveer:main 发 PR）；`main`/`develop` 日常流程不变。
+- 路线图唯一权威版本：`docs/porting/upstream-prs.md`（含 PR
+  队列、文件级清单、提取操作手册、验收纪律与执行记录）。
+  阶段 0 剩余：同步上游进 main、issue #94 回帖告知拆分计划。
 
 ## 2026-10-21 — Windows exe 内嵌应用图标（D21）
 

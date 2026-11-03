@@ -597,3 +597,40 @@
   的 MSYS2 同样有，且同为 Ninja + MinGW 路线（本地已同法验证）。
 - 依据：主人 2026-10-21 指示（「我才反应过来，windows 版本的
   seer 程序没图标啊」→「修吧」「排版，做 v2.8.1-win3」）。
+
+## D22 — 启动上游 PR 输出：拆 8 个小 PR、`pr/*` 短命分支从上游 tip 切出
+
+- 日期：2026-11-03
+- 状态：已采纳（主人决策；上游作者 2026-11-02 在 issue #94 同意
+  接受 PR）
+- 背景：上游作者 epasveer 在 issue #94（2026-11-02，
+  comment 6591567389）明确欢迎 PR（"Yes, absolutely. PR's are
+  welcomed"，附贡献者署名），并表示将深入评审 console 方案。
+  fork 在 2026-10-26 的 issue 公告中已承诺：PR 严格藏在 Windows
+  守卫后，若被接受则退役 fork 转向单一上游。src/ 的可上游化
+  改动约 600 行（总 diff +856 中扣除 fork 专用的
+  `SeerStackTrace` 与 docs/CI/README）。
+- 决策：
+  1. 拆 8 个小 PR 串行提交，排序按「基础层优先 × 作者接受度
+     降序」，每 PR 独立可验收；完整队列、文件级清单与验收
+     标准见 `docs/porting/upstream-prs.md`（唯一权威版本，含
+     执行记录）；
+  2. 新增 `pr/*` 短命分支类型：一律从 `upstream-main`（刚快进
+     的上游 tip）切出、推 origin、向 `epasveer:main` 发 PR；
+     不从 `main`/`develop` 切（会带上 fork 专属提交）；上游
+     merge 或放弃即删；
+  3. review 意见的修改以作者为准，同步回带 `main`，保证两侧
+     收敛、将来 merge 零冲突；
+  4. PR#1（MI 线缆 `\NNN` 转义还原）是唯一改变 Linux 行为的
+     PR——它本来就是修 Linux 也存在的 bug，作为打头阵的
+     「带回归测试的行为改进」是刻意安排；其余 PR 维持「Linux
+     零行为变化」纪律；
+  5. 每个上游 merge 后按 maintenance.md §1 小同步；全部合入后
+     的终态（fork 退役 / 转型纯发布渠道 / 连 Windows 发布
+     工作流一并送上游）届时另立决策。
+- 影响：`AGENTS.md` 硬性约束 1（分支策略）补 `pr/*` 一段；
+  `docs/porting/upstream-prs.md` 新增；maintenance.md 顶部指向上
+  游输出线。阶段 0 剩余事项（同步上游、issue 回帖）见该文档
+  §7 清单。
+- 依据：主人 2026-11-03 指示（制定 PR 计划并落文档，供换机
+  继续）；上游作者 issue #94 2026-11-02 回复。

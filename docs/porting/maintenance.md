@@ -1,7 +1,9 @@
 # Seer Windows fork 维护策略
 
-本 fork 长期自维护（上游对 Windows 移植持 `wontfix` 态度，见
-`AGENTS.md` 引 issue #94），因此维护流程是交付物的一部分。
+本 fork 长期自维护（历史背景见 `AGENTS.md` 引 issue #94；
+2026-11-02 起上游作者已同意接受 PR——向上游「送」的工作流是
+另一条线，见 `docs/porting/upstream-prs.md`（D22），本文件管
+「从上游取」与发布），因此维护流程是交付物的一部分。
 核心约束来自 D2：**跨平台单一代码库 + 对上游文件最小 diff**，
 一切流程围绕「让定期 merge 上游保持低成本」设计。
 
