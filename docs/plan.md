@@ -801,6 +801,7 @@ WSL2 `[100%]` 双构建 0 error；无头冒烟无崩溃。
 | 2026-10-21 | D21：Windows exe 内嵌应用图标——上游美术生成多尺寸 .ico + seergdb.rc（windres，WIN32 守卫）+ 显式 manifest；零 C++ 改动，Linux 不受影响 | 主人决策，全文见 `docs/porting/decisions.md` | 维护期 |
 | 2026-11-03 | D22：启动上游 PR 输出——小 PR 串行提交、`pr/*` 短命分支一律从 upstream tip 切出（队列与操作手册见 `docs/porting/upstream-prs.md`；本行 2026-11-09 补记） | 主人决策，全文见 `docs/porting/decisions.md` | 维护期 |
 | 2026-11-09 | D23：上游 PR 队列收敛为 3 个（路径 / Windows 平台块 / console 压轴），回帖留「单个大 PR」备选口子 | 主人决策，全文见 `docs/porting/decisions.md` | 维护期 |
+| 2026-11-10 | D24：上游 PR base 定为 `epasveer:main`（拆分粒度获作者 "smaller PR's are better" 确认；驳回再 `gh pr edit --base` 改投 `94-windows-support`）；阶段跟踪与本地验证装备见 `docs/pr_plan.md` | 主人决策，全文见 `docs/porting/decisions.md` | 维护期 |
 
 ## 风险登记
 

@@ -662,3 +662,37 @@
 - 依据：主人 2026-11-09 指示（回帖拆三个 PR：路径归一化、
   windows blocks、console，「太多了我感觉也累」）；上游作者
   issue #94 2026-11-08 回复。
+
+## D24 — 上游 PR 的 base 定为 `epasveer:main`，拆分粒度获作者确认
+
+- 日期：2026-11-10
+- 状态：已采纳（主人决策）
+- 背景：作者 2026-11-09 在 issue #94 回复（comment 6747992508）：
+  "Smaller PR's are better, I think."——D23 留的「并成单个大 PR」
+  口子关闭，3-PR 拆分定案。同时存在一个待澄清点：作者 2026-11-08
+  说过会把 PR「并进 #94 的分支」，上游也确有 `94-windows-support`
+  分支，PR 究竟该以它还是 `main` 为 base 存在歧义。查证
+  （2026-11-10）：该分支与 `main` **完全相同**（compare: 0 ahead /
+  0 behind，同为 `6ec2019`），无独有提交，历史上也从未有 PR 以它
+  为 base；它系作者在 fork 回帖之前自己开的工作分支。另：上游
+  #532 有以非 main 分支（`447-openocd-review`）为 base 的先例，
+  故不能纯靠惯例排除。
+- 决策：
+  1. **PR base 定为 `epasveer:main`，不再向作者问询**（主人
+     2026-11-10 决定，理由：让 PR 更快落地；`main` 是代码最终
+     必须落的地方，也是「fork 退役」承诺的前提）；
+  2. 作者 review 时若驳回、要求改投 `94-windows-support`：用
+     `gh pr edit --base` 改（零成本）；届时后续 PR 的切分支基线
+     换成该分支 tip（`git fetch upstream 94-windows-support`，
+     `upstream-main` 镜像只跟 `main`）；
+  3. 本轮上游同步（`8d19e2d` → `6ec2019`）同时完成：merge 零
+     冲突；上游被动了 `SeerGdbWidget.cpp`（connect 块 /
+     `handleGdbThreadSelectFrame` / ParallelStacks 接线），与 fork
+     平台块 hunk 区域不重叠，不影响 §4 文件级清单；上游新增的
+     gdb 命令点（`-thread-select`、`frame %1`）只带整数参数，
+     I7 无需补包裹。
+- 影响：upstream-prs.md §1/§3/§7/§10 已同步；进度跟踪与本地验证
+  装备（V1-V7）在 `docs/pr_plan.md`（阶段 0 出口条件含本决策）。
+- 依据：主人 2026-11-10 指示（「不问了，直接发 main，让这几个 PR
+  更快落地，他如果驳回再说」）；作者 issue #94 2026-11-09 回复；
+  `gh api` 对 `94-windows-support` 分支的 compare / PR base 查证。

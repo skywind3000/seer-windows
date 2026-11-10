@@ -131,6 +131,24 @@
 已知遗留：R8 偶发 qFatal（捕获网就绪待复现）、若干可接受级
 差异清单见 verification.md §5。
 
+## 2026-11-10 — 上游 PR base 定案 + 上游同步（D24）
+
+- 作者 2026-11-09 在 issue #94 回复 "Smaller PR's are better, I
+  think."，3-PR 拆分定案（「单个大 PR」口子关闭）。
+- PR base 定为 `epasveer:main`（D24）：不再向作者问询；若驳回用
+  `gh pr edit --base` 改投 `94-windows-support`（该分支当前与
+  `main` 完全相同、无独有提交）。
+- 阶段切分与进度跟踪落 `docs/pr_plan.md`（6 阶段：同步 → PR#1
+  路径 → PR#2 平台块 → PR#3 console → yml 上游化 → 收敛退役），
+  含每个 PR 发出前必须全过的本地验证装备 V1-V7。
+- 本轮上游同步见「上游同步记录」末行。
+
 ## 上游同步记录
 
 （每次 merge 上游后在此追加一行。）
+
+- 2026-11-10：`8d19e2d` → `6ec2019`（14 提交：ParallelStacks
+  双击选帧/暗色修复/MiniMap 重塑 + Dockerfile）。merge 零冲突；
+  invariants I1-I9 结构核对全过（含上游新增命令点 `-thread-select`/
+  `frame %1` 无路径参数、I7 无需补包裹）；双平台全量构建通过
+  （Windows 126 步零 error；WSL2 clean 重建 exit=0）。

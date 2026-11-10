@@ -32,9 +32,13 @@
   当初就是为此准备的，现在兑现。
 - **上游要求**：`CONTRIBUTING.md` 全文一句话——走 PR、遵循
   STYLEGUIDE。无 CLA。
-- **上游活跃**：2026-11-03 上游 tip `67abf83`，较本 fork 镜像
-  （`8d19e2d`）领先 10 提交（ParallelStacks 主题，与 fork 改动
-  零文件交集）。每切新 PR 分支前必须重新 fetch。
+- **上游活跃**：2026-11-10 同步后上游 tip `6ec2019`，本轮新增
+  14 提交（ParallelStacks 主题 + Dockerfile）；其中 `SeerGdbWidget.cpp`
+  被动（:245 connect、:2411 `handleGdbThreadSelectFrame`、:3091
+  ParallelStacks 接线），但与 fork 平台块 hunk 区域不重叠，merge
+  零冲突。上游现存 `94-windows-support` 分支与 `main` 完全相同
+  （无独有提交），系作者在 fork 回帖前自开的工作分支。每切新 PR
+  分支前必须重新 fetch。
 
 ## 2. 总体策略：四个阶段
 
@@ -59,6 +63,12 @@
 - 推送到 **origin**（`upstream` remote 禁推是 D13 的刻意设计），
   GitHub 上从 `skywind3000:pr/<topic>` → `epasveer:main` 发 PR
   （仓库改名 seer-windows 后 fork 关系仍在，PR 通道可用）。
+  **PR base 已定：`epasveer:main`**（D24，2026-11-10；作者
+  2026-11-09 回复 "Smaller PR's are better, I think." 确认拆分，
+  大 PR 口子关闭）。若作者 review 时要求改投 `94-windows-support`，
+  `gh pr edit --base` 即改；届时后续 PR 的切分支基线换成该分支
+  的 tip（`git fetch upstream 94-windows-support`，`upstream-main`
+  镜像只跟 `main`）。
 - `main`/`develop` 的日常流程不动；`pr/*` 与 `fix/*`、`sync/*`、
   `pre-sync-*` 命名空间互不干扰。上游 merge 或放弃即删分支。
 - **review 意见的改动以作者为准**：改 pr 分支的同时把等价改动
@@ -190,13 +200,17 @@ Linux 行为改进」。用它打头阵是刻意的：证明这个 fork 的输�
 
 ## 7. 阶段 0 启动清单
 
-- [ ] 同步上游进 `main`：走 maintenance.md §1 全流程（2026-11-03
-      时上游领先 10 提交、ParallelStacks 主题、与 fork 改动零文件
-      交集，预期零冲突；双平台回归照跑）。
+- [x] 同步上游进 `main`：2026-11-10 完成（`8d19e2d` → `6ec2019`，
+      14 提交、merge 零冲突、invariants I1-I9 结构核对全过、双平台
+      构建回归，细节见 `docs/pr_plan.md` 执行记录）。
 - [x] issue #94 回帖：已发 2026-11-09（comment
       <https://github.com/epasveer/seer/issues/94#issuecomment-6740703807>），
-      3-PR 拆分 + 大 PR 口子，console 设计讨论口子已留。
+      3-PR 拆分 + 大 PR 口子，console 设计讨论口子已留；作者
+      2026-11-09 回复 "Smaller PR's are better"（comment
+      6747992508）确认拆分、口子关闭。
 - [x] 本文档 + D22 + AGENTS.md `pr/*` 分支策略（2026-11-03 完成）。
+- 进度跟踪与各 PR 发出前的本地验证步骤（V1-V7）见
+  `docs/pr_plan.md`（阶段切分与其出口条件在那里维护）。
 
 ## 8. 阶段 3：收敛与退役
 
@@ -229,3 +243,5 @@ Linux 行为改进」。用它打头阵是刻意的：证明这个 fork 的输�
 | --- | --- | --- |
 | 2026-11-03 | 计划定稿并入库（D22、本文档、AGENTS.md 分支策略） | 阶段 0 剩：同步上游、issue 回帖 |
 | 2026-11-09 | 队列 8 → 3 个 PR（D23）；issue #94 回帖已发（comment 6740703807，3-PR 口径 + 大 PR 口子） | 阶段 0 剩：同步上游；随后按 §4 发 PR#1 |
+| 2026-11-09 | 作者确认拆分："Smaller PR's are better"（comment 6747992508）；PR base 定为 `epasveer:main`（D24，主人决定） | 大 PR 口子关闭；`94-windows-support` 与 `main` 相同、无独有提交 |
+| 2026-11-10 | 同步上游完成：镜像 `8d19e2d`→`6ec2019`，merge 零冲突，invariants I1-I9 全过，Windows 构建 126 步零 error；阶段 0 完成 | 进度与验证装备移至 `docs/pr_plan.md`；下一步阶段 1（PR#1） |
