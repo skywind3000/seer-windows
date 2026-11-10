@@ -261,9 +261,10 @@
 
 ## 阶段 1：PR#1 路径归一化（试点）
 
-状态：进行中——PR **#572** 已开（2026-11-10，base=`epasveer:main`），
-待作者 review；任务剩 1.6（review 往返）/1.7（合入后小同步）/1.8
-（试点复盘）。
+状态：进行中——PR **#572** 已开（2026-11-10，base=`epasveer:main`）；
+第一轮 review（作者配置的 copilot 自动 review，5 条意见全部核实为真
+缺陷并修复，`3c7e20f`）已逐条回复并 resolve；任务剩 1.6 后续轮次 /
+1.7（合入后小同步）/1.8（试点复盘）。
 
 前置：阶段 0 出口条件全部满足。
 
@@ -626,3 +627,4 @@ README 指向上游（兑现我们在 issue 的承诺）；② fork 转型为纯
 | 2026-11-10 | 1 | 任务 1.1-1.3 完成：切分支 + 提取（12 src 文件 210+/41- + 测试三文件）+ 本地验证全过（V1-V7、双平台 hellopathnorm 13/13、octal PoC 基线 broken/PR resolved 对照、V5 卫生与 V6 隔离零命中、Linux 中文路径 headless 会话） | 规模与 §4 估算一致 |
 | 2026-11-10 | 1 | 深度回归抓到两个真缺陷并修复（Finding A：octal 字节编码随 inferior 构建方式而异，UTF-8/ANSI 双态，原解码只支持 GBK → 严格 UTF-8 先验+回退；Finding B：`file="..."` 字段同样带转义未重写 → 扩为 `(?:fullname\|file)`）；修复 commit `54da161`（pr 分支）已镜像到 main（`b2a0687`+`50a2e07`），hellopathnorm 补 2 用例至 14 项双平台全过 | Windows 会话复验：x64 18.1 与 x86 17.1 中文路径会话截图确认编辑器打开中文源码；--bs 反斜杠/小写拼写断点哨兵测试双双命中 |
 | 2026-11-10 | 1 | PR #572 已开（+473/-41，15 文件，3 提交）；描述含 motivation/what/rationale/verification/Linux 行为五段，验证记录含基线对照 | 剩 1.6 review 往返、1.7 合入后小同步、1.8 试点复盘 |
+| 2026-11-10 | 1 | copilot review（作者配的自动 review）5 条意见全部核实属实并修复（`\` 原子消费、0x5C 多字节保护、双候选存在性消歧、channel 透传、测试 ACP 无关化），PR 分支 `3c7e20f` + main 镜像 `73164db` | 重验全过：hellopathnorm 16/16+15/15、pr 分支隔离 Linux 构建零警告、x64/x86 中文路径会话截图确认；PR 上发总结评论+5 条线程逐一回复并 resolve |
