@@ -40,7 +40,7 @@
 | 阶段 | 名称 | 分支 | 状态 |
 |---|---|---|---|
 | 0 | 准备与基线（同步上游、确认 base 分支） | `sync/<date>` | 已完成 |
-| 1 | PR#1 路径归一化（试点，跑通全流程） | `pr/path-normalize` | 未开始 |
+| 1 | PR#1 路径归一化（试点，跑通全流程） | `pr/path-normalize` | 进行中（PR #572 已开，待 review） |
 | 2 | PR#2 Windows 平台块（五合一） | `pr/win-platform` | 未开始 |
 | 3 | PR#3 console 分流（旗舰，压轴） | `pr/win-console-split` | 未开始 |
 | 4 | Windows 发布 workflow 上游化 + 自动构建 | `pr/win-release-ci` | 未开始 |
@@ -261,7 +261,9 @@
 
 ## 阶段 1：PR#1 路径归一化（试点）
 
-状态：未开始
+状态：进行中——PR **#572** 已开（2026-11-10，base=`epasveer:main`），
+待作者 review；任务剩 1.6（review 往返）/1.7（合入后小同步）/1.8
+（试点复盘）。
 
 前置：阶段 0 出口条件全部满足。
 
@@ -274,12 +276,12 @@ Linux 行为的 PR**（八进制还原本身修 Linux bug），PR 描述按「�
 
 ### 任务
 
-- [ ] 1.1 fetch 上游，从最新 tip 切 `pr/path-normalize`（§6 步骤
+- [x] 1.1 fetch 上游，从最新 tip 切 `pr/path-normalize`（§6 步骤
       0-1）。
-- [ ] 1.2 提取改动：新文件整取、混合文件（`SeerGdbWidget.cpp`、
+- [x] 1.2 提取改动：新文件整取、混合文件（`SeerGdbWidget.cpp`、
       `GdbMonitor.cpp`、`SeerUtl.{h,cpp}`）按 hunk 裁剪，补丁形态
       与 `main` 逐行一致（§5 提取手法）。
-- [ ] 1.3 **本地验证（全过才进 1.4）**——记录存 `.tmp/pr1-verify/`：
+- [x] 1.3 **本地验证（全过才进 1.4）**——记录存 `.tmp/pr1-verify/`：
       - [ ] 1.3a V1 Linux 构建 + V2 Windows 构建（各用
             `build-*-pr1` 目录）。
       - [ ] 1.3b V3 零新增警告：先在 `upstream-main` 上原样构建一
@@ -310,9 +312,9 @@ Linux 行为的 PR**（八进制还原本身修 Linux bug），PR 描述按「�
       - [ ] 1.3h 双 gdb 交叉（`<GDB64>` 18.1 / `<GDB32>` 17.1）：
             MI 记录重写涉及 `fullname` 解析，两份 gdb 各跑一遍
             1.3f 的 ①，注意 17.1 输出的反斜杠拼写差异。
-- [ ] 1.4 整理成 1-3 个干净英文提交（引用 issue #94，遵循
+- [x] 1.4 整理成 1-3 个干净英文提交（引用 issue #94，遵循
       STYLEGUIDE），push `origin pr/path-normalize`。
-- [ ] 1.5 开 PR（base = `epasveer:main`），描述按 §5 模板五段
+- [x] 1.5 开 PR（base = `epasveer:main`），描述按 §5 模板五段
       （motivation / what / design rationale / verification / Linux
       行为说明）。verification 段直接贴 1.3 的记录摘要（命令 + 结
       果 + 日期 + 双平台构建版本号），**尤其要写清 1.3c 的对照**：
@@ -621,3 +623,6 @@ README 指向上游（兑现我们在 issue 的承诺）；② fork 转型为纯
 | 2026-11-10 | 0 | 任务 0.4 完成：PR base 定为 `epasveer:main`（主人决定，不问作者，驳回再改） | 查证：`94-windows-support` 与 `main` 完全相同、无独有提交、从无 PR 以其为 base；剩余任务 0.1/0.2/0.3/0.5 |
 | 2026-11-10 | 0 | 补「验证装备（V1-V7）」一节，各阶段任务里的验证项展开成可执行子清单（含具体命令、被测程序、判定标准） | 依据：`docs/build-windows.md` §2/§4、`docs/porting/verification.md` §2.1/§3/§4、`tests/hellopathnorm/README.md`、`AGENTS.local.md`；`.tmp/phase6` 自动化脚本本机不存在，验证步骤一律写成手工可复现形态 |
 | 2026-11-10 | 0 | 任务 0.1/0.2/0.3/0.5 完成：镜像快进 `8d19e2d`→`6ec2019`、merge 零冲突、invariants I1-I9 全过、双平台构建+hellopathnorm 13/13+x64/x86 冒烟 PASS、diff 交集复核（仅 SeerGdbWidget.cpp 且 hunk 不重叠）、D24 入库；`main` 快进并 push（`c942eb4`+`da21069`），sync 分支已删 | 阶段 0 出口条件满足，置「已完成」；下一步：阶段 1（PR#1 路径归一化） |
+| 2026-11-10 | 1 | 任务 1.1-1.3 完成：切分支 + 提取（12 src 文件 210+/41- + 测试三文件）+ 本地验证全过（V1-V7、双平台 hellopathnorm 13/13、octal PoC 基线 broken/PR resolved 对照、V5 卫生与 V6 隔离零命中、Linux 中文路径 headless 会话） | 规模与 §4 估算一致 |
+| 2026-11-10 | 1 | 深度回归抓到两个真缺陷并修复（Finding A：octal 字节编码随 inferior 构建方式而异，UTF-8/ANSI 双态，原解码只支持 GBK → 严格 UTF-8 先验+回退；Finding B：`file="..."` 字段同样带转义未重写 → 扩为 `(?:fullname\|file)`）；修复 commit `54da161`（pr 分支）已镜像到 main（`b2a0687`+`50a2e07`），hellopathnorm 补 2 用例至 14 项双平台全过 | Windows 会话复验：x64 18.1 与 x86 17.1 中文路径会话截图确认编辑器打开中文源码；--bs 反斜杠/小写拼写断点哨兵测试双双命中 |
+| 2026-11-10 | 1 | PR #572 已开（+473/-41，15 文件，3 提交）；描述含 motivation/what/rationale/verification/Linux 行为五段，验证记录含基线对照 | 剩 1.6 review 往返、1.7 合入后小同步、1.8 试点复盘 |
