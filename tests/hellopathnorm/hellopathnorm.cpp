@@ -1,9 +1,8 @@
-// SPDX-FileCopyrightText: 2026 seer porting fork
+// SPDX-FileCopyrightText: 2026 seer contributors
 //
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Self-checking regression test for the Windows path normalization
-// layers (docs/porting/decisions.md D8/D10, docs/porting/specs/gdb-glue.md §6).
+// Self-checking regression test for the path normalization layers.
 //
 //   1. Seer::normalizeSourcePath  — gdb command layer (separators only)
 //   2. Seer::normalizeFileKey     — key layer (separators + case folding)
@@ -26,6 +25,7 @@
 #include <QtCore/QFile>
 #include <QtCore/QDir>
 #include <QtCore/QTimer>
+#include <QtCore/QDebug>
 #include <iostream>
 
 static int g_failures = 0;
@@ -142,7 +142,10 @@ int main (int argc, char* argv[]) {
     const QString samplePath = QDir::tempPath() + "/hellopathnorm-mi.txt";
     {
         QFile f(samplePath);
-        f.open(QIODevice::WriteOnly);
+        if (f.open(QIODevice::WriteOnly) == false) {
+            qCritical() << "Can't open" << samplePath;
+            return 1;
+        }
         f.write((starBackslash + "\n").toUtf8());
         f.write((doneTwoFields + "\n").toUtf8());
         f.write((tildeEscaped  + "\n").toUtf8());

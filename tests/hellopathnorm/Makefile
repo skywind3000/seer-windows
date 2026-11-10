@@ -1,4 +1,4 @@
-# Regression test for the path normalization layers (D8/D10).
+# Regression test for the path normalization layers.
 # Links the real SeerUtl/GdbMonitor sources (moc included), so the
 # actual production code is exercised.
 .PHONY: all

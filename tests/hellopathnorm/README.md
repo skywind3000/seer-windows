@@ -1,5 +1,4 @@
-Self-checking regression test for the Windows path normalization layers
-(docs/porting/decisions.md D8/D10, docs/porting/specs/gdb-glue.md §6).
+Self-checking regression test for the path normalization layers.
 
 Covers:
 
@@ -17,18 +16,16 @@ Build and run (Linux / WSL):
     make
     ./hellopathnorm
 
-Build and run (Windows, MSYS2 mingw64 — from the Git Bash):
+Build and run (Windows, MSYS2 mingw64 — from the Git Bash, with the
+mingw64 root below referred to as <MINGW64>):
 
-    export PATH=/d/Linux/mingw64/bin:$PATH
-    /d/Linux/mingw64/share/qt6/bin/moc.exe ../../src/GdbMonitor.h -o moc_GdbMonitor.cpp
+    export PATH=/<MINGW64>:$PATH
+    <MINGW64>/share/qt6/bin/moc.exe ../../src/GdbMonitor.h -o moc_GdbMonitor.cpp
     g++ -fPIC -o hellopathnorm.exe \
         hellopathnorm.cpp ../../src/SeerUtl.cpp ../../src/GdbMonitor.cpp moc_GdbMonitor.cpp \
-        -I../../src -I/d/Linux/mingw64/include/qt6 \
-        -L/d/Linux/mingw64/lib -lQt6Core -lQt6Gui -lQt6Widgets -lQt6Charts
+        -I../../src -I<MINGW64>/include/qt6 \
+        -L<MINGW64>/lib -lQt6Core -lQt6Gui -lQt6Widgets -lQt6Charts
     ./hellopathnorm.exe
 
 (SeerUtl pulls in QtWidgets and QtCharts; GdbMonitor needs its moc output
-linked. The full sequence is scripted in .tmp/regression/run.sh on the
-build machine.)
-
-(fork addition, 2026-10; not upstream)
+linked.)
