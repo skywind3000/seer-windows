@@ -259,6 +259,7 @@ SeerGdbWidget::SeerGdbWidget (QWidget* parent) : QWidget(parent) {
     QObject::connect(threadManagerWidget->threadFramesBrowserWidget(),          &SeerThreadFramesBrowserWidget::finishThreadId,                                             this,                                                           &SeerGdbWidget::handleGdbFinishThreadId);
     QObject::connect(threadManagerWidget->threadFramesBrowserWidget(),          &SeerThreadFramesBrowserWidget::continueThreadId,                                           this,                                                           &SeerGdbWidget::handleGdbContinueThreadId);
     QObject::connect(threadManagerWidget->threadFramesBrowserWidget(),          &SeerThreadFramesBrowserWidget::interruptThreadId,                                          this,                                                           &SeerGdbWidget::handleGdbInterruptThreadId);
+    QObject::connect(threadManagerWidget->threadFramesBrowserWidget(),          &SeerThreadFramesBrowserWidget::launchParallelStacks,                                       this,                                                           &SeerGdbWidget::handleGdbParallelStacksVisualizer);
 
     QObject::connect(threadManagerWidget->threadIdsBrowserWidget(),             &SeerThreadIdsBrowserWidget::refreshThreadIds,                                              this,                                                           &SeerGdbWidget::handleGdbThreadListIds);
     QObject::connect(threadManagerWidget->threadIdsBrowserWidget(),             &SeerThreadIdsBrowserWidget::selectedThread,                                                this,                                                           &SeerGdbWidget::handleGdbThreadSelectId);
@@ -2442,6 +2443,20 @@ void SeerGdbWidget::handleGdbThreadSelectId (int threadid) {
     emit stoppingPointReached();
 }
 
+void SeerGdbWidget::handleGdbThreadSelectFrame (int threadid, int frameno) {
+
+    if (executableLaunchMode() == "") {
+        return;
+    }
+
+    handleGdbCommand(QString("-thread-select %1").arg(threadid));
+
+    // See handleGdbStackSelectFrame() for why this isn't -stack-select-frame.
+    handleGdbCommand(QString("frame %1").arg(frameno));
+
+    emit stoppingPointReached();
+}
+
 void SeerGdbWidget::handleGdbAdaListTasks () {
 
     if (executableLaunchMode() == "") {
@@ -3108,6 +3123,7 @@ void SeerGdbWidget::handleGdbParallelStacksVisualizer () {
     }
 
     SeerParallelStacksVisualizerWidget* w = new SeerParallelStacksVisualizerWidget(0);
+    w->setExternalFilePatterns(sourceIgnoreFilePatterns());
     w->show();
 
     // Connect things.
@@ -3115,6 +3131,9 @@ void SeerGdbWidget::handleGdbParallelStacksVisualizer () {
     QObject::connect(_gdbMonitor,                                       &GdbMonitor::caretTextOutput,                                          w,       &SeerParallelStacksVisualizerWidget::handleText);
     QObject::connect(w,                                                 &SeerParallelStacksVisualizerWidget::refreshParallelStackFrames,       this,    &SeerGdbWidget::handleGdbParallelStackFrames);
     QObject::connect(w,                                                 &SeerParallelStacksVisualizerWidget::selectedThread,                   this,    &SeerGdbWidget::handleGdbThreadSelectId);
+    QObject::connect(w,                                                 &SeerParallelStacksVisualizerWidget::selectedThreadFrame,              this,    &SeerGdbWidget::handleGdbThreadSelectFrame);
+    QObject::connect(w,                                                 &SeerParallelStacksVisualizerWidget::selectedFile,                     editorManagerWidget, &SeerEditorManagerWidget::handleOpenFile);
+    QObject::connect(w,                                                 &SeerParallelStacksVisualizerWidget::maybeSelectedAddress,             editorManagerWidget, &SeerEditorManagerWidget::handleMaybeOpenAddress);
     QObject::connect(threadManagerWidget->threadFramesBrowserWidget(),  &SeerThreadFramesBrowserWidget::selectedThread,                        w,       &SeerParallelStacksVisualizerWidget::highlightSelectedThread);
     QObject::connect(stackManagerWidget->stackFramesBrowserWidget(),    &SeerStackFramesBrowserWidget::selectedFrame,                          w,       &SeerParallelStacksVisualizerWidget::highlightSelectedFrame);
 

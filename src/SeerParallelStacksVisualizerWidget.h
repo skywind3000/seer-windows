@@ -30,9 +30,18 @@ class SeerParallelStacksVisualizerWidget : public QWidget, protected Ui::SeerPar
         void                        setShowMinimapMode                  (const QString& mode);
         const QString&              showMinimapMode                     () const;
 
+        // Frames whose source file matches one of these (Seer's Source
+        // Config "Ignore" patterns) are external code, like
+        // frames without debug info. Takes effect on the next refresh.
+        void                        setExternalFilePatterns             (const QStringList& patterns);
+        const QStringList&          externalFilePatterns                () const;
+
     signals:
         void                        refreshParallelStackFrames          (int id);
         void                        selectedThread                      (int threadId);
+        void                        selectedThreadFrame                 (int threadId, int frameLevel);
+        void                        selectedFile                        (QString file, QString fullname, int lineno);
+        void                        maybeSelectedAddress                (QString file, QString fullname, QString address);
 
     public slots:
         void                        refresh                             ();
@@ -80,6 +89,9 @@ class SeerParallelStacksVisualizerWidget : public QWidget, protected Ui::SeerPar
         // A thread was picked in one of the graph's popup tables.
         void                        handleGraphThreadSelected           (int threadId);
 
+        // A frame row was double-clicked in the graph.
+        void                        handleGraphFrameSelected            (int threadId, int frameDepth);
+
     protected:
         void                        writeSettings                       ();
         void                        readSettings                        ();
@@ -117,13 +129,21 @@ class SeerParallelStacksVisualizerWidget : public QWidget, protected Ui::SeerPar
         SeerParallelStacksThreads   graphThreads                        (const QString& pivot) const;
         void                        updateFilterButton                  ();
 
+        // Drop filter entries the popup no longer lists once external code
+        // is hidden: functions and libraries seen only in external frames,
+        // and threads made only of them. Entries not in the current stacks
+        // at all are kept, for later refreshes.
+        void                        removeExternalFilters               ();
+
         int                         _id;
+        int                         _selectFrameId;         // ID for the frames-list sent after a graph frame selection (see handleGraphFrameSelected())
         SeerParallelStacksThreads   _threads;
         SeerParallelStacksThreads   _graphThreads;          // the threads the current graph was built from (see graphThreads())
         int                         _currentThreadId    = -1;
         int                         _currentFrameLevel  = 0;
         QString                     _methodPivot;           // the pivot the current Method View graph was built on
         SeerParallelStacksSettings  _settings;
+        QStringList                 _externalFilePatterns;
 
         // The filter, by name/id so it survives a refresh.
         SeerParallelStacksFilterWidget* _filterPopup = nullptr;

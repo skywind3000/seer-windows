@@ -50,6 +50,7 @@ class SeerParallelStacksStackBoxItem : public QObject, public QGraphicsItem {
         // current thread or one the user picked in a popup table — so there
         // is only ever one highlight, not two independent ones.
         void                    setHighlightedThreadId  (int threadId);
+        bool                    isActiveStack           () const;
 
         // Sets which frame depth to bold (kNoFrameDepth clears it) — depth-from-bottom
         // (SeerParallelStacksFrame::depth()), not the thread-relative
@@ -76,14 +77,28 @@ class SeerParallelStacksStackBoxItem : public QObject, public QGraphicsItem {
         // (drawn with a search-colored border).
         void                    setCurrentSearchMatch   (bool flag);
 
+        // Cancels a pending popup and tears down one that's showing (e.g.
+        // because the view was zoomed out from under it).
+        void                    hidePopup               ();
+
+        // Brings a showing popup up to date with the graph's current thread
+        // and this box's highlighted frame. No-op without a popup.
+        void                    refreshPopup            ();
+
     signals:
         // Forwarded from this box's popup table when a row is selected there.
         void                    selectedThread          (int threadId);
+
+        // A frame row was double-clicked. threadId is the graph's current
+        // thread if this box holds it, otherwise this box's first thread.
+        // frameDepth is the row's depth() (see setHighlightedFrameDepth()).
+        void                    selectedThreadFrame     (int threadId, int frameDepth);
 
     protected:
         QVariant                itemChange              (GraphicsItemChange change, const QVariant& value) override;
 
         void                    mousePressEvent         (QGraphicsSceneMouseEvent* event) override;
+        void                    mouseDoubleClickEvent   (QGraphicsSceneMouseEvent* event) override;
         void                    mouseMoveEvent          (QGraphicsSceneMouseEvent* event) override;
         void                    mouseReleaseEvent       (QGraphicsSceneMouseEvent* event) override;
         void                    hoverEnterEvent         (QGraphicsSceneHoverEvent* event) override;
@@ -98,6 +113,10 @@ class SeerParallelStacksStackBoxItem : public QObject, public QGraphicsItem {
         // Global (screen) rect this box occupies, used to test whether the
         // cursor is still over the node.
         QRect                   globalRect              () const;
+
+        // The function of the frame this box bolds (see paint()), or empty
+        // if it bolds none.
+        QString                 activeFunction          () const;
 
         // Fills _frameRows (and the parallel _frameRowDepths) with the
         // frame-row texts to draw. Honors the showFullStackSize / stackSize
@@ -152,6 +171,10 @@ class SeerParallelStacksLiveEdge : public QGraphicsItem {
         // the edge renders nothing and its own destructor won't touch `box`.
         void            detachEndpoint   (SeerParallelStacksStackBoxItem* box);
 
+        // Re-evaluates whether both endpoints are active-thread boxes (drawn
+        // thicker, in the active-box color, above the plain edges). Called
+        // by StackBoxItem when its active state changes.
+        void            refreshHighlight ();
 
     private:
         SeerParallelStacksStackBoxItem*     _from;   // child  (bottom anchor)
@@ -177,7 +200,11 @@ class SeerParallelStacksMiniMapWidget : public QWidget {
     public:
         explicit SeerParallelStacksMiniMapWidget(SeerParallelStacksGraphicsView* view, QWidget* parent = nullptr);
 
-        QSize   sizeHint                () const override { return QSize(180, 140); }
+        QSize   sizeHint                () const override { return _size; }
+
+        // Reshapes the minimap to the graph's aspect ratio, keeping roughly
+        // the same area. Returns true if the size changed.
+        bool    updateShape             ();
 
     public slots:
         void    refresh                 ();   // call whenever the scene or the main view's viewport changes
@@ -202,7 +229,12 @@ class SeerParallelStacksMiniMapWidget : public QWidget {
         // independent of where the minimap itself has been parked.
         QRectF  overviewSceneRect       () const;
 
+        // The scene region the graph's nodes occupy (plus padding). Its
+        // aspect ratio sets the minimap's shape.
+        QRectF  graphSceneRect          () const;
+
         SeerParallelStacksGraphicsView* _view;
+        QSize                           _size = QSize(180, 140);
         bool                            _dragging = false;   // plain left-drag: navigating the graph
         bool                            _moving   = false;   // shift + left-drag: repositioning this widget
         QPoint                          _moveGrabOffset;     // cursor offset within the widget at move start
@@ -218,11 +250,15 @@ class SeerParallelStacksPopupTableWidget : public QFrame {
     public:
         explicit SeerParallelStacksPopupTableWidget(QWidget* parent = nullptr);
 
-        void            addRow                          (int threadId, const QString& name, const QString& function);
+        void            addRow                          (int threadId, const QString& name);
 
         // Sets which row (by threadId) shows the "current thread" highlight
         // and restyles the rows already in the table to match.
         void            setCurrentThreadId              (int threadId);
+
+        // Shows function in every row — the box's threads all share its
+        // frames. Empty blanks them.
+        void            setActiveFunction               (const QString& function);
 
     protected:
         void            leaveEvent                      (QEvent* event) override;
@@ -289,8 +325,7 @@ class SeerParallelStacksGraphicsView : public QGraphicsView {
         // frame picked in the external stack frames browser) is responsible
         // for converting a level to a depth using that thread's own frame
         // count, since only it knows which thread the level came from. The
-        // graph has no frame-selection UI of its own, so there's no
-        // popup-driven counterpart to this one.
+        // double-click-driven counterpart is handleFrameSelected().
         void            setCurrentFrameDepth            (int frameDepth);
 
         // Sets both at once, restyling the graph in a single pass instead of
@@ -313,6 +348,9 @@ class SeerParallelStacksGraphicsView : public QGraphicsView {
     signals:
         // Forwarded from whichever StackBoxItem's popup table had a row selected.
         void            selectedThread                  (int threadId);
+
+        // Forwarded from whichever StackBoxItem had a frame row double-clicked.
+        void            selectedThreadFrame             (int threadId, int frameDepth);
 
     protected:
         void            wheelEvent                      (QWheelEvent* event) override;
@@ -339,6 +377,11 @@ class SeerParallelStacksGraphicsView : public QGraphicsView {
         // graph's current thread, restyles every box that holds it, and
         // forwards the selection on via the selectedThread signal.
         void            handleThreadSelected            (int threadId);
+
+        // A frame row was double-clicked in some box. Makes threadId and
+        // frameDepth the graph's current highlight and forwards them on via
+        // the selectedThreadFrame signal.
+        void            handleFrameSelected             (int threadId, int frameDepth);
 
     private:
         struct PlacedNode {
@@ -369,6 +412,8 @@ class SeerParallelStacksGraphicsView : public QGraphicsView {
         void            zoomBy                      (double factor, QGraphicsView::ViewportAnchor anchor);
         // 'Esc' — refit the whole graph to the viewport (normal zoom level).
         void            resetZoom                   ();
+        // Hides every box's popup — a zoom moves the boxes out from under them.
+        void            hidePopups                  ();
 
         // Places the minimap widget. Until the user Shift-drags it, this pins
         // it to the bottom-right corner of the viewport. Once dragged, the
@@ -388,6 +433,12 @@ class SeerParallelStacksGraphicsView : public QGraphicsView {
         // minimap plus padding — the "make room for it" behavior nodes get
         // from handleGrowSceneRectToFitItems().
         void            growSceneForMiniMap         ();
+
+        // Resets the scene rect to exactly what's needed: the nodes plus
+        // padding, and an anchored minimap. The grow-only paths above never
+        // give space back, so this is called at rest points (end of a drag,
+        // zoom, minimap reshape) to drop room nothing occupies any more.
+        void            tightenSceneRect            ();
 
         // Shows or hides the minimap according to _showMinimapMode. In "Auto"
         // mode the minimap is shown only while one of the view's scrollbars is

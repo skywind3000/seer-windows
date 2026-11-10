@@ -65,6 +65,17 @@ namespace {
         return g_darkTheme ? dark : light;
     }
 
+    // Edges between active-thread boxes. Dark mode reuses the active box
+    // background; light mode's pale active background vanishes against the
+    // view, so a deeper amber of the same hue is used there instead.
+    QColor activeEdgeColor () {
+
+        static const QColor light(0xB8, 0x86, 0x0B);
+        static const QColor dark (0x5A, 0x4A, 0x1A);
+
+        return g_darkTheme ? dark : light;
+    }
+
     const MiniMapColors& miniMapColors () {
 
         static const MiniMapColors light { QColor(0xFF, 0xFF, 0xFF, 230), QColor(0x88, 0x88, 0x88), QColor(0x5A, 0x8F, 0xD6), QColor(0x1A, 0x52, 0xA8, 40), QColor(0x1A, 0x52, 0xA8), QColor(0xE0, 0x6C, 0x00) };
@@ -321,7 +332,16 @@ void SeerParallelStacksStackBoxItem::setHighlightedThreadId(int threadId) {
 
     _isActiveStack = active;
 
+    for (SeerParallelStacksLiveEdge* e : _edges) {
+        e->refreshHighlight();
+    }
+
     update();
+}
+
+bool SeerParallelStacksStackBoxItem::isActiveStack() const {
+
+    return _isActiveStack;
 }
 
 void SeerParallelStacksStackBoxItem::setHighlightedFrameDepth(int frameDepth) {
@@ -429,7 +449,54 @@ void SeerParallelStacksStackBoxItem::mousePressEvent(QGraphicsSceneMouseEvent* e
         return;
     }
 
+    // Accept a plain left press, so the scene keeps this box as the target
+    // of the double-click that may follow. The base class ignores presses on
+    // items that aren't movable or selectable.
+    if (event->button() == Qt::LeftButton) {
+        event->accept();
+        return;
+    }
+
     QGraphicsItem::mousePressEvent(event);
+}
+
+void SeerParallelStacksStackBoxItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) {
+
+    if (event->button() != Qt::LeftButton || event->modifiers() & Qt::ShiftModifier) {
+        QGraphicsItem::mouseDoubleClickEvent(event);
+        return;
+    }
+
+    event->accept();
+
+    // Frame rows start below the header row.
+    const qreal rowsTop = _kPadY + _kRowH;
+
+    if (event->pos().y() < rowsTop) {
+        return;
+    }
+
+    const int row = (int)((event->pos().y() - rowsTop) / _kRowH);
+
+    // A "[...]" row stands in for several frames, so it has no single one to select.
+    if (row < 0 || row >= _frameRowDepths.size() || _frameRowDepths[row] == kNoFrameDepth) {
+        return;
+    }
+
+    if (_threadIds.isEmpty()) {
+        return;
+    }
+
+    // Stay on the graph's current thread if it passes through this box.
+    int threadId = _threadIds.first();
+
+    if (auto* v = viewOf(this)) {
+        if (_threadIds.contains(v->currentThreadId())) {
+            threadId = v->currentThreadId();
+        }
+    }
+
+    emit selectedThreadFrame(threadId, _frameRowDepths[row]);
 }
 
 void SeerParallelStacksStackBoxItem::mouseMoveEvent(QGraphicsSceneMouseEvent* event) {
@@ -514,10 +581,18 @@ void SeerParallelStacksStackBoxItem::handleShowPopup() {
         return;
     }
 
-    QString frame;
+    // The popup hangs off the node's bottom edge. Don't pop up if that edge
+    // is scrolled (or zoomed) out of the view.
+    if (auto* v = viewOf(this)) {
 
-    if (_stack.frames.size() > 0) {
-        frame = _stack.frames[0].functionOrAddr();
+        const QRectF sceneRect = mapToScene(boundingRect()).boundingRect();
+        const QPoint left      = v->mapFromScene(sceneRect.bottomLeft());
+        const QPoint right     = v->mapFromScene(sceneRect.bottomRight());
+        const QRect  vp        = v->viewport()->rect();
+
+        if (left.y() < vp.top() || left.y() > vp.bottom() || right.x() < vp.left() || left.x() > vp.right()) {
+            return;
+        }
     }
 
     // Match the graph's current highlighted thread — there's no such thing
@@ -533,8 +608,10 @@ void SeerParallelStacksStackBoxItem::handleShowPopup() {
     _popup->setCurrentThreadId(currentThreadId);
 
     for (int i = 0; i < _threadIds.size(); ++i) {
-        _popup->addRow(_threadIds[i], _stack.threadNames.value(i), frame);
+        _popup->addRow(_threadIds[i], _stack.threadNames.value(i));
     }
+
+    _popup->setActiveFunction(activeFunction());
 
     // Position below the item, aligned to its left edge
     _popup->move(globalRect().bottomLeft());
@@ -568,6 +645,43 @@ void SeerParallelStacksStackBoxItem::handleMaybeClosePopup() {
             handleDeletePopup();
         }
     });
+}
+
+void SeerParallelStacksStackBoxItem::refreshPopup() {
+
+    if (_popup == nullptr) {
+        return;
+    }
+
+    if (auto* v = viewOf(this)) {
+        _popup->setCurrentThreadId(v->currentThreadId());
+    }
+
+    _popup->setActiveFunction(activeFunction());
+}
+
+QString SeerParallelStacksStackBoxItem::activeFunction() const {
+
+    if (_isActiveStack == false || _highlightedFrameDepth == kNoFrameDepth) {
+        return QString();
+    }
+
+    // Searched in _stack.frames, not _frameRows, so it's found even when
+    // it's folded into a "[...]" row.
+    for (const SeerParallelStacksFrame& f : _stack.frames) {
+        if (f.depth() == _highlightedFrameDepth) {
+            return f.functionOrAddr();
+        }
+    }
+
+    return QString();
+}
+
+void SeerParallelStacksStackBoxItem::hidePopup() {
+
+    _hoverTimer->stop();
+
+    handleDeletePopup();
 }
 
 void SeerParallelStacksStackBoxItem::handleDeletePopup() {
@@ -641,6 +755,17 @@ QPainterPath SeerParallelStacksLiveEdge::shape() const {
     return QPainterPath();
 }
 
+void SeerParallelStacksLiveEdge::refreshHighlight() {
+
+    bool highlighted = _from && _to && _from->isActiveStack() && _to->isActiveStack();
+
+    // Still behind the boxes (z 0), but above the plain edges (z -1) where
+    // they converge on a shared parent.
+    setZValue(highlighted ? -0.5 : -1);
+
+    update();
+}
+
 void SeerParallelStacksLiveEdge::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*) {
 
     if (!_from || !_to) return;
@@ -673,9 +798,12 @@ void SeerParallelStacksLiveEdge::paint(QPainter* painter, const QStyleOptionGrap
     path.moveTo(base);
     path.cubicTo(base + QPointF(0,  _kVCtrl), to   + QPointF(0, -_kVCtrl), to);
 
-    const QColor color = edgeColor();
+    // An edge between two active-thread boxes follows the thread's path, so
+    // draw it in the active color and a little thicker.
+    const bool   highlighted = _from->isActiveStack() && _to->isActiveStack();
+    const QColor color       = highlighted ? activeEdgeColor() : edgeColor();
 
-    painter->setPen(QPen(color, 1.5));
+    painter->setPen(QPen(color, highlighted ? 3.0 : 1.5));
     painter->setBrush(Qt::NoBrush);
     painter->drawPath(path);
 
@@ -706,10 +834,23 @@ QRectF SeerParallelStacksMiniMapWidget::contentRect() const {
 
 void SeerParallelStacksMiniMapWidget::refresh() {
 
+    // The graph may have changed shape (rebuilt, or a node dragged). If the
+    // minimap reshapes, have the view re-place it so it stays pinned/anchored.
+    // Don't tighten mid-drag: shrinking the scene under a dragged node (e.g.
+    // the rightmost one dragged left) clamps the scrollbars and jumps the view.
+    // endDragScroll() tightens once the drag is over.
+    if (updateShape() && _view) {
+        _view->repositionMiniMap();
+
+        if (!_view->_nodeDragScroll && !_view->_miniMapDragScroll) {
+            _view->tightenSceneRect();
+        }
+    }
+
     update();
 }
 
-QRectF SeerParallelStacksMiniMapWidget::overviewSceneRect() const {
+QRectF SeerParallelStacksMiniMapWidget::graphSceneRect() const {
 
     if (!_view || !_view->scene()) {
         return QRectF();
@@ -723,15 +864,75 @@ QRectF SeerParallelStacksMiniMapWidget::overviewSceneRect() const {
         }
     }
 
-    // Always keep the current visible region in frame so the viewport marker
-    // stays inside the overview.
-    r = r.united(_view->mapToScene(_view->viewport()->rect()).boundingRect());
-
     if (r.isEmpty()) {
-        r = _view->sceneRect();
+        return r;
     }
 
     return r.adjusted(-20, -20, 20, 20);
+}
+
+bool SeerParallelStacksMiniMapWidget::updateShape() {
+
+    const QRectF graph = graphSceneRect();
+
+    if (graph.isEmpty()) {
+        return false;
+    }
+
+    // Keep about the same area as the original 180x140 minimap, shaped to the
+    // graph's aspect ratio, within sensible limits. The limits are also capped
+    // to a fraction of the view so a very wide/tall graph can't swamp it.
+    const qreal kArea = 180.0 * 140.0;
+    const qreal kMinW = 60,  kMinH = 40;
+    qreal       maxW  = 320, maxH  = 240;
+
+    if (_view) {
+        maxW = std::max(kMinW, std::min(maxW, _view->viewport()->width()  * 0.5));
+        maxH = std::max(kMinH, std::min(maxH, _view->viewport()->height() * 0.5));
+    }
+
+    const qreal aspect = graph.width() / graph.height();
+
+    qreal w = std::sqrt(kArea * aspect);
+    qreal h = std::sqrt(kArea / aspect);
+
+    // Clamp to the max box while preserving the aspect ratio...
+    if (w > maxW) { w = maxW; h = w / aspect; }
+    if (h > maxH) { h = maxH; w = h * aspect; }
+
+    // ...then enforce the minimums (an extreme graph gets letterboxed).
+    w = std::max(w, kMinW);
+    h = std::max(h, kMinH);
+
+    const QSize newSize(qRound(w), qRound(h));
+
+    if (newSize == _size) {
+        return false;
+    }
+
+    _size = newSize;
+    updateGeometry();
+
+    return true;
+}
+
+QRectF SeerParallelStacksMiniMapWidget::overviewSceneRect() const {
+
+    if (!_view || !_view->scene()) {
+        return QRectF();
+    }
+
+    // Frame just the graph. The minimap is shaped to the graph's aspect ratio,
+    // so including the visible region (which, zoomed out, can extend well past
+    // the graph on one axis) would letterbox the overview with empty space.
+    // The viewport marker is clipped to this rect instead.
+    QRectF r = graphSceneRect();
+
+    if (r.isEmpty()) {
+        r = _view->sceneRect().adjusted(-20, -20, 20, 20);
+    }
+
+    return r;
 }
 
 void SeerParallelStacksMiniMapWidget::paintEvent(QPaintEvent* ) {
@@ -787,8 +988,13 @@ void SeerParallelStacksMiniMapWidget::paintEvent(QPaintEvent* ) {
         }
     }
 
-    // Draw the main view's current visible region as an outlined box.
-    const QRectF visibleScene = _view->mapToScene(_view->viewport()->rect()).boundingRect();
+    // Draw the main view's current visible region as an outlined box, clipped
+    // to the overview so it stays inside the minimap.
+    const QRectF visibleScene = _view->mapToScene(_view->viewport()->rect()).boundingRect().intersected(sceneRect);
+
+    if (visibleScene.isEmpty()) {
+        return;
+    }
 
     QRectF viewportMarker(sceneToWidget(visibleScene.topLeft()), sceneToWidget(visibleScene.bottomRight()));
 
@@ -889,6 +1095,7 @@ void SeerParallelStacksMiniMapWidget::mouseReleaseEvent(QMouseEvent* event) {
 
     if (_dragging && event->button() == Qt::LeftButton) {
         _dragging = false;
+        if (_view) _view->tightenSceneRect();
         event->accept();
         return;
     }
@@ -911,13 +1118,33 @@ SeerParallelStacksPopupTableWidget::SeerParallelStacksPopupTableWidget(QWidget* 
     setFrameShape(QFrame::Box);
     setFrameShadow(QFrame::Plain);
     setLineWidth(1);
-    setStyleSheet(
+
+    // Color the popup from the same theme-aware palette as the boxes so it
+    // matches the graph rather than the desktop's Qt palette. Set before the
+    // table is created so it (and its header/scrollbars) inherit it. A new
+    // popup is built on every hover, so it always picks up the current theme.
+    const BoxColors& colors = boxColors();
+
+    QPalette pal = palette();
+    pal.setColor(QPalette::Window,          colors.background);
+    pal.setColor(QPalette::WindowText,      colors.headerText);
+    pal.setColor(QPalette::Base,            colors.background);
+    pal.setColor(QPalette::AlternateBase,   colors.background);
+    pal.setColor(QPalette::Text,            colors.headerText);
+    pal.setColor(QPalette::Button,          colors.background);
+    pal.setColor(QPalette::ButtonText,      colors.headerText);
+    pal.setColor(QPalette::Mid,             colors.divider);
+    pal.setColor(QPalette::Highlight,       colors.dragOutline);
+    pal.setColor(QPalette::HighlightedText, colors.background);
+    setPalette(pal);
+
+    setStyleSheet(QString(
             "SeerParallelStacksPopupTableWidget {"
-            "  background-color: palette(window);"
-            "  border: 1px solid #888;"
+            "  background-color: %1;"
+            "  border: 1px solid %2;"
             "  border-radius: 4px;"
             "}"
-            );
+            ).arg(colors.background.name(), colors.border.name()));
 
     // Ensure leaveEvent fires reliably even without buttons held
     setMouseTracking(true);
@@ -951,7 +1178,7 @@ SeerParallelStacksPopupTableWidget::SeerParallelStacksPopupTableWidget(QWidget* 
     layout->addWidget(_table);
 }
 
-void SeerParallelStacksPopupTableWidget::addRow (int threadId, const QString& name, const QString& frame) {
+void SeerParallelStacksPopupTableWidget::addRow (int threadId, const QString& name) {
 
     int nrows = _table->rowCount();
 
@@ -966,7 +1193,7 @@ void SeerParallelStacksPopupTableWidget::addRow (int threadId, const QString& na
     item1->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     item1->setFlags(item1->flags()|Qt::ItemIsEditable);
 
-    QTableWidgetItem* item2 = new QTableWidgetItem(frame);
+    QTableWidgetItem* item2 = new QTableWidgetItem();
     item2->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     item2->setFlags(item2->flags()|Qt::ItemIsEditable);
 
@@ -986,6 +1213,15 @@ void SeerParallelStacksPopupTableWidget::setCurrentThreadId (int threadId) {
     _currentThreadId = threadId;
 
     refreshRowHighlights();
+}
+
+void SeerParallelStacksPopupTableWidget::setActiveFunction (const QString& function) {
+
+    for (int row = 0; row < _table->rowCount(); ++row) {
+        _table->item(row, 2)->setText(function);
+    }
+
+    _table->resizeColumnToContents(2);
 }
 
 void SeerParallelStacksPopupTableWidget::refreshRowHighlights () {
@@ -1137,6 +1373,8 @@ void SeerParallelStacksGraphicsView::updateMiniMapVisibility () {
 
 void SeerParallelStacksGraphicsView::zoomBy(double factor, QGraphicsView::ViewportAnchor anchor) {
 
+    hidePopups();
+
     const QGraphicsView::ViewportAnchor prev = transformationAnchor();
 
     setTransformationAnchor(anchor);
@@ -1144,13 +1382,24 @@ void SeerParallelStacksGraphicsView::zoomBy(double factor, QGraphicsView::Viewpo
     setTransformationAnchor(prev);
 
     repositionMiniMap();
-    growSceneForMiniMap();
+    tightenSceneRect();
     updateMiniMapVisibility();
 
     if (_miniMap) _miniMap->refresh();
 }
 
+void SeerParallelStacksGraphicsView::hidePopups() {
+
+    for (QGraphicsItem* item : _scene->items()) {
+        if (auto* box = dynamic_cast<SeerParallelStacksStackBoxItem*>(item)) {
+            box->hidePopup();
+        }
+    }
+}
+
 void SeerParallelStacksGraphicsView::resetZoom() {
+
+    hidePopups();
 
     const QRectF bounds = _scene->itemsBoundingRect();
 
@@ -1161,7 +1410,7 @@ void SeerParallelStacksGraphicsView::resetZoom() {
     }
 
     repositionMiniMap();
-    growSceneForMiniMap();
+    tightenSceneRect();
     updateMiniMapVisibility();
 
     if (_miniMap) _miniMap->refresh();
@@ -1218,6 +1467,9 @@ void SeerParallelStacksGraphicsView::resizeEvent(QResizeEvent* event) {
 
     QGraphicsView::resizeEvent(event);
 
+    // The minimap's size limits depend on the viewport size.
+    if (_miniMap) _miniMap->updateShape();
+
     repositionMiniMap();
     updateMiniMapVisibility();
 }
@@ -1263,14 +1515,39 @@ void SeerParallelStacksGraphicsView::growSceneForMiniMap() {
 
     if (!_miniMap || !_miniMapAnchored || !_miniMap->isVisible()) return;
 
-    // Keep the scene rect big enough to hold the minimap plus the same 40px
-    // margin handleGrowSceneRectToFitItems() keeps around the nodes — this is
-    // what "makes room" for it as it's dragged toward an edge. Grow only.
-    const QRectF needed  = miniMapSceneRect().adjusted(-40, -40, 40, 40);
+    // Keep the scene rect big enough to hold the minimap. While it's being
+    // Shift-dragged, also add the same 40px margin handleGrowSceneRectToFitItems()
+    // keeps around the nodes — this is what "makes room" for it as it's dragged
+    // toward an edge. Otherwise (e.g. navigating with it, which re-anchors it
+    // on every move) the margin would creep the scene outward a bit at a time
+    // whenever the minimap sits near a viewport edge. Grow only.
+    const qreal  margin  = _miniMapDragScroll ? 40 : 0;
+    const QRectF needed  = miniMapSceneRect().adjusted(-margin, -margin, margin, margin);
     const QRectF current = _scene->sceneRect();
 
     if (!current.contains(needed)) {
         _scene->setSceneRect(current.united(needed));
+    }
+}
+
+void SeerParallelStacksGraphicsView::tightenSceneRect() {
+
+    if (_scene->items().isEmpty()) {
+        return;
+    }
+
+    // The nodes plus the same 40px margin fitSceneToItems() and
+    // handleGrowSceneRectToFitItems() keep around them, plus an anchored
+    // minimap so it stays reachable. Unlike the grow-only paths, this can
+    // shrink the scene.
+    QRectF needed = _scene->itemsBoundingRect().adjusted(-40, -40, 40, 40);
+
+    if (_miniMap && _miniMapAnchored && _miniMap->isVisible()) {
+        needed = needed.united(miniMapSceneRect());
+    }
+
+    if (needed != _scene->sceneRect()) {
+        _scene->setSceneRect(needed);
     }
 }
 
@@ -1308,10 +1585,18 @@ void SeerParallelStacksGraphicsView::beginMiniMapDragScroll() {
 
 void SeerParallelStacksGraphicsView::endDragScroll() {
 
+    const bool wasDragging = _nodeDragScroll || _miniMapDragScroll;
+
     _nodeDragScroll     = false;
     _miniMapDragScroll  = false;
     _autoScrollVelocity = QPoint();
     _autoScrollTimer.stop();
+
+    // The drag only ever grew the scene; now that it's over, drop any room
+    // it made that nothing occupies any more.
+    if (wasDragging) {
+        tightenSceneRect();
+    }
 }
 
 void SeerParallelStacksGraphicsView::updateDragScroll(const QPoint& viewportPos) {
@@ -1599,6 +1884,7 @@ void SeerParallelStacksGraphicsView::buildPlacedTree(PlacedNode* pn, const SeerP
         _scene->addItem(pn->item);
 
         QObject::connect(pn->item, &SeerParallelStacksStackBoxItem::selectedThread, this, &SeerParallelStacksGraphicsView::handleThreadSelected);
+        QObject::connect(pn->item, &SeerParallelStacksStackBoxItem::selectedThreadFrame, this, &SeerParallelStacksGraphicsView::handleFrameSelected);
     }
 
     for (const auto& child : stack.stacks) {
@@ -1787,6 +2073,13 @@ void SeerParallelStacksGraphicsView::handleThreadSelected(int threadId) {
     emit selectedThread(threadId);
 }
 
+void SeerParallelStacksGraphicsView::handleFrameSelected(int threadId, int frameDepth) {
+
+    setCurrentHighlight(threadId, frameDepth);
+
+    emit selectedThreadFrame(threadId, frameDepth);
+}
+
 void SeerParallelStacksGraphicsView::applyCurrentHighlight() {
 
     // Highlight every box holding the current thread — including a shared
@@ -1797,6 +2090,7 @@ void SeerParallelStacksGraphicsView::applyCurrentHighlight() {
         if (auto* box = dynamic_cast<SeerParallelStacksStackBoxItem*>(item)) {
             box->setHighlightedThreadId(_currentThreadId);
             box->setHighlightedFrameDepth(_currentFrameDepth);
+            box->refreshPopup();
         }
     }
 }
