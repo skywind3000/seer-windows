@@ -39,7 +39,7 @@
 
 | 阶段 | 名称 | 分支 | 状态 |
 |---|---|---|---|
-| 0 | 准备与基线（同步上游、确认 base 分支） | `sync/<date>` | 进行中 |
+| 0 | 准备与基线（同步上游、确认 base 分支） | `sync/<date>` | 已完成 |
 | 1 | PR#1 路径归一化（试点，跑通全流程） | `pr/path-normalize` | 未开始 |
 | 2 | PR#2 Windows 平台块（五合一） | `pr/win-platform` | 未开始 |
 | 3 | PR#3 console 分流（旗舰，压轴） | `pr/win-console-split` | 未开始 |
@@ -201,30 +201,49 @@
 
 ## 阶段 0：准备与基线
 
-状态：进行中
+状态：已完成（2026-11-10）
 
 前置：无。
 
 ### 任务
 
-- [ ] 0.1 `git fetch upstream`，把镜像快进到上游当前 tip
+- [x] 0.1 `git fetch upstream`，把镜像快进到上游当前 tip
       （`git fetch upstream main:upstream-main`、
-      `git push origin upstream-main`）。
-- [ ] 0.2 按 `maintenance.md` §1 全流程把上游合进 `main`：打
+      `git push origin upstream-main`）。已完成（2026-11-10）：
+      `8d19e2d` → `6ec2019`，镜像本地与 origin 同步。
+- [x] 0.2 按 `maintenance.md` §1 全流程把上游合进 `main`：打
       `pre-sync-<date>` 锚点 → `sync/<date>` 分支 merge → 逐条核对
       `invariants.md` 红线 → 双平台回归（= 本文 V1 + V2 + V4，加
       `maintenance.md` §1 第 4 步的 Windows 矩阵抽样与 V6 grep 复
       查）→ 快进 `main` 并 push → `docs/CHANGELOG.md` 记一条。
-- [ ] 0.3 同步后复核可上游化 diff 规模（原估约 600 行 / 32 文件），
+      已完成（2026-11-10，提交 `c942eb4` + `da21069`，锚点
+      `pre-sync-20261110`）：merge 零冲突（16 文件 +629/-50）；
+      invariants I1-I9 结构核对全过；上游新增命令点
+      （`-thread-select` / `frame %1`）只带整数参数，I7 无需补包裹；
+      Windows 全量构建 126 步零 error；WSL2 clean 全量重建 exit=0
+      （增量构建曾报 clock skew，已 clean 重跑排除假绿）；
+      hellopathnorm 双平台 13/13；x64（gdb 18.1 + hellofibonacci）
+      与 x86（gdb 17.1 + t-hello32）会话冒烟均 PASS（停 main 命中、
+      优雅关闭、无残留）。脚本存 `.tmp/pr0-verify/smoke-x64.ps1`
+      （ConstrainedLanguage 限 cmdlet/`taskkill`，不可用
+      `.CloseMainWindow()`）。
+- [x] 0.3 同步后复核可上游化 diff 规模（原估约 600 行 / 32 文件），
       确认上游新增提交（ParallelStacks 等）与三个 PR 的文件没有新
       交集；有交集则更新 `upstream-prs.md` §4 的文件级清单。
+      已完成（2026-11-10）：合并后 diff 仍为 32 文件 +856/-64
+      （规模不变）；上游本轮 14 提交与 fork diff 的交集仅
+      `SeerGdbWidget.cpp` 一个文件，且 hunk 区域不重叠（上游动
+      :245 connect 块 / :2411 `handleGdbThreadSelectFrame` / :3091
+      ParallelStacks 接线；fork 动 :39-44 / :99-103 / :868 /
+      :2081 / :3972 一带），§4 文件级清单无需更新。
 - [x] 0.4 PR base 分支：**定为 `epasveer:main`**（主人 2026-11-10
       决定，不向作者问询；详见 §0）。
-- [ ] 0.5 把两项新事实补进 `upstream-prs.md`：§1 背景事实加作者
+- [x] 0.5 把两项新事实补进 `upstream-prs.md`：§1 背景事实加作者
       2026-11-09「smaller PR's are better」（大 PR 口子关闭）与
       base=main 的决定及理由，§3 的 `epasveer:main` 处加一句
       「已确认，若作者驳回改投 `94-windows-support`」；同时追加
-      D24 与 `docs/plan.md` 决策记录表索引行。
+      D24 与 `docs/plan.md` 决策记录表索引行。已完成（2026-11-10，
+      随 `da21069` 入库）。
 - [x] 0.6 检查 `origin` 的 fork 关系仍可用于跨仓 PR（仓库已改名
       `seer-windows`）：`gh api` 实测 `parent` / `source` 均为
       `epasveer/seer`，`fork=true`，通道完好（2026-11-10）。真正
@@ -601,3 +620,4 @@ README 指向上游（兑现我们在 issue 的承诺）；② fork 转型为纯
 | 2026-11-10 | 0 | 阶段 0 置「进行中」 | 剩：0.1-0.6（镜像快进、上游合入 main、base 分支确认） |
 | 2026-11-10 | 0 | 任务 0.4 完成：PR base 定为 `epasveer:main`（主人决定，不问作者，驳回再改） | 查证：`94-windows-support` 与 `main` 完全相同、无独有提交、从无 PR 以其为 base；剩余任务 0.1/0.2/0.3/0.5 |
 | 2026-11-10 | 0 | 补「验证装备（V1-V7）」一节，各阶段任务里的验证项展开成可执行子清单（含具体命令、被测程序、判定标准） | 依据：`docs/build-windows.md` §2/§4、`docs/porting/verification.md` §2.1/§3/§4、`tests/hellopathnorm/README.md`、`AGENTS.local.md`；`.tmp/phase6` 自动化脚本本机不存在，验证步骤一律写成手工可复现形态 |
+| 2026-11-10 | 0 | 任务 0.1/0.2/0.3/0.5 完成：镜像快进 `8d19e2d`→`6ec2019`、merge 零冲突、invariants I1-I9 全过、双平台构建+hellopathnorm 13/13+x64/x86 冒烟 PASS、diff 交集复核（仅 SeerGdbWidget.cpp 且 hunk 不重叠）、D24 入库；`main` 快进并 push（`c942eb4`+`da21069`），sync 分支已删 | 阶段 0 出口条件满足，置「已完成」；下一步：阶段 1（PR#1 路径归一化） |
